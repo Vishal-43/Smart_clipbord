@@ -88,4 +88,4 @@ if __name__ == "__main__":
     clear_screen()
     print_history()
 
-    print("Exiting program.")
+    print("Exiting program."
