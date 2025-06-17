@@ -1,7 +1,14 @@
 import pyperclip
 import time
+from datetime import datetime
 import os
 import sqlite3
+from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QListWidget, QListWidgetItem
+from PyQt6.QtCore import Qt
+import sys
+from PyQt6.QtCore import QThread, pyqtSignal, Qt
+
+
 
 DB_name = "clipboard.db"
 def create_db():
@@ -81,11 +88,34 @@ def clipbord_monitor():
             clear_screen()
             print(f"\nAn error occurred: {e}")
 
+class ClipboardApp(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("clipboard manager")
+        self.setGeometry(100,100,600,400)
+        create_db()
+        centralwidget = QWidget()
+        self.setCentralWidget(centralwidget)
+        layout = QVBoxLayout()
+        centralwidget.setLayout(layout)
+
+        self.history_widget = QListWidget()
+        layout.addWidget(self.history_widget)
+        self.load_history()
+
+    def load_history(self):
+        self.history_widget.clear()
+        history = get_history()
+        for item_id,content,timestamp in history:
+             display_text = f"[{datetime.fromisoformat(timestamp).strftime('%H:%M:%S %m-%d')}] {content}"
+             list_item = QListWidgetItem(display_text)
+             list_item.setData(Qt.ItemDataRole.UserRole,item_id)
+             self.history_widget.addItem(list_item)
+
 if __name__ == "__main__":
-    create_db()
-
-    clipbord_monitor()
-    clear_screen()
-    print_history()
-
-    print("Exiting program.")
+    
+    app = QApplication(sys.argv)
+    window = ClipboardApp()
+    window.show()
+    # clipbord_monitor()
+    sys.exit(app.exec())
