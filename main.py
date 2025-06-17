@@ -103,6 +103,41 @@ class ClipboardApp(QMainWindow):
         layout.addWidget(self.history_widget)
         self.load_history()
 
+        self.monitor_thread = ClipboardMonitorThread()
+        self.monitor_thread.new_content_copied.connect(self.add_item_to_gui_and_db)
+        self.monitor_thread.start()
+
+
+    def add_item_to_gui_and_db(self, content):
+        """Receives new content from the monitor thread, saves to DB, and updates GUI."""
+        # Save to database
+        conn = sqlite3.connect(DB_name)
+        cursor = conn.cursor()
+        current_time = datetime.now().isoformat()
+        try:
+            cursor.execute("INSERT INTO history (content, timestamp) VALUES (?, ?)",
+                           (content, current_time))
+            conn.commit()
+        except sqlite3.Error as e:
+            print(f"Database error on insert from thread: {e}")
+        finally:
+            conn.close()
+
+        # Add to GUI (at the top for latest items)
+        display_text = f"[{datetime.fromisoformat(current_time).strftime('%H:%M:%S %m-%d')}] {content}"
+        list_item = QListWidgetItem(display_text)
+        list_item.setData(Qt.ItemDataRole.UserRole, content)
+        self.history_list_widget.insertItem(0, list_item) # Insert at the beginning
+        self.history_list_widget.scrollToTop() # Ensure latest is visible
+
+
+    # NEW METHOD to stop the thread when the app quits
+    def stop_monitor_thread(self):
+        if self.monitor_thread and self.monitor_thread.isRunning():
+            self.monitor_thread.stop()
+        
+
+
     def load_history(self):
         self.history_widget.clear()
         history = get_history()
@@ -111,6 +146,45 @@ class ClipboardApp(QMainWindow):
              list_item = QListWidgetItem(display_text)
              list_item.setData(Qt.ItemDataRole.UserRole,item_id)
              self.history_widget.addItem(list_item)
+
+
+class ClipboardMonitorThread(QThread):
+    new_content_copied = pyqtSignal(str)
+    def __init__(self,parent=None):
+        super().__init__(parent)
+        self._running = True
+        self.last_copied = pyperclip.paste()
+    def run(self):
+        print("clipbord moniter started")
+        lastcopied = pyperclip.paste()
+        
+        while True:
+            try:
+                current_copied = pyperclip.paste()
+
+                if current_copied != lastcopied:
+                    save_history(current_copied)
+                    clear_screen()
+                    
+                    print(f"latest containt is {time.strftime('%H:%M:%S')}")
+                    print("_"*100)
+                    print(current_copied)
+                    print("_"*100)
+                    
+                    lastcopied = current_copied
+                time.sleep(1)
+            except KeyboardInterrupt:
+                clear_screen()
+                print("\nclipboard moniter stopped")
+                break
+            except Exception as e:
+                clear_screen()
+                print(f"\nAn error occurred: {e}")  
+
+    def stop(self):
+        self._running = False
+        
+        self.wait()
 
 if __name__ == "__main__":
     
